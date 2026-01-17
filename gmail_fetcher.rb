@@ -85,8 +85,8 @@ class GmailFetcher
 
     if format == "full"
       data[:body] = {
-        plain_text: extract_body(message.payload, "text/plain"),
-        html: extract_body(message.payload, "text/html")
+        plain_text: extract_body_with_encoding(message.payload, "text/plain"),
+        html: extract_body_with_encoding(message.payload, "text/html")
       }
       data[:attachments] = extract_attachments(message.payload)
     end
@@ -153,7 +153,7 @@ class GmailFetcher
     attachments
   end
 
-  # Base64 URL-safeデコードを行う
+  # Base64 URL-safeデコードを行う（既にデコード済みの場合はそのまま返す）
   #
   # @param encoded_data [String] エンコードされたデータ
   # @return [String] デコードされた文字列
@@ -162,7 +162,69 @@ class GmailFetcher
 
     Base64.urlsafe_decode64(encoded_data).force_encoding("UTF-8")
   rescue ArgumentError
+    # Gmail APIが既にデコード済みのデータを返す場合がある
+    encoded_data.force_encoding("UTF-8")
+  end
+
+  # Content-Typeヘッダーからcharsetを抽出する
+  #
+  # @param content_type [String, nil] Content-Typeヘッダー値
+  # @return [String, nil] charset値
+  def extract_charset(content_type)
+    return nil if content_type.nil?
+
+    match = content_type.match(/charset=["']?([^"';\s]+)["']?/i)
+    match&.[](1)
+  end
+
+  # エンコーディングを考慮してメッセージ本文を抽出する
+  #
+  # @param payload [Google::Apis::GmailV1::MessagePart] メッセージペイロード
+  # @param mime_type [String] 取得したいMIMEタイプ
+  # @return [String] デコードされた本文
+  def extract_body_with_encoding(payload, mime_type)
+    return "" if payload.nil?
+
+    # 単一パートの場合
+    if payload.mime_type == mime_type && payload.body&.data
+      return decode_body_with_encoding(payload.body.data, payload.headers)
+    end
+
+    # マルチパートの場合
+    if payload.parts
+      target_part = payload.parts.find { |p| p.mime_type == mime_type }
+      return decode_body_with_encoding(target_part.body.data, target_part.headers) if target_part&.body&.data
+
+      payload.parts.each do |part|
+        result = extract_body_with_encoding(part, mime_type)
+        return result unless result.empty?
+      end
+    end
+
     ""
+  end
+
+  # エンコーディングを考慮してBase64デコードを行う（既にデコード済みの場合も対応）
+  #
+  # @param encoded_data [String] エンコードされたデータ
+  # @param headers [Array<Google::Apis::GmailV1::MessagePartHeader>, nil] ヘッダー配列
+  # @return [String] デコードされた文字列
+  def decode_body_with_encoding(encoded_data, headers)
+    return "" if encoded_data.nil? || encoded_data.empty?
+
+    content_type = find_header(headers || [], "Content-Type")
+    charset = extract_charset(content_type) || "UTF-8"
+
+    # Base64デコードを試みる。失敗した場合は既にデコード済みとみなす
+    decoded = begin
+      Base64.urlsafe_decode64(encoded_data)
+    rescue ArgumentError
+      encoded_data.dup
+    end
+
+    decoded.encode("UTF-8", charset, invalid: :replace, undef: :replace)
+  rescue Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError
+    decoded.force_encoding("UTF-8")
   end
 end
 

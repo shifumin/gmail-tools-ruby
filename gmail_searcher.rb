@@ -32,10 +32,11 @@ class GmailSearcher
   # @param query [String] Gmail検索クエリ
   # @param max_results [Integer] 最大取得件数
   # @param include_body [Boolean] メール本文を含めるか
+  # @param include_html [Boolean] HTML本文を含めるか
   # @return [void]
-  def search(query:, max_results: DEFAULT_MAX_RESULTS, include_body: true)
+  def search(query:, max_results: DEFAULT_MAX_RESULTS, include_body: true, include_html: false)
     message_ids = fetch_message_ids(query, max_results)
-    messages = message_ids.map { |msg| fetch_message_detail(msg.id, include_body) }
+    messages = message_ids.map { |msg| fetch_message_detail(msg.id, include_body, include_html) }
 
     result = {
       query: query,
@@ -109,10 +110,11 @@ class GmailSearcher
   #
   # @param message_id [String] メッセージID
   # @param include_body [Boolean] 本文を含めるか
+  # @param include_html [Boolean] HTML本文を含めるか
   # @return [Hash] メッセージデータ
-  def fetch_message_detail(message_id, include_body)
+  def fetch_message_detail(message_id, include_body, include_html)
     message = @service.get_user_message("me", message_id, format: "full")
-    build_message_data(message, include_body)
+    build_message_data(message, include_body, include_html)
   rescue StandardError => e
     { id: message_id, error: e.message }
   end
@@ -121,8 +123,9 @@ class GmailSearcher
   #
   # @param message [Google::Apis::GmailV1::Message] メッセージ
   # @param include_body [Boolean] 本文を含めるか
+  # @param include_html [Boolean] HTML本文を含めるか
   # @return [Hash] 整形されたメッセージデータ
-  def build_message_data(message, include_body)
+  def build_message_data(message, include_body, include_html)
     headers = message.payload&.headers || []
 
     data = {
@@ -137,9 +140,14 @@ class GmailSearcher
     }
 
     if include_body
-      plain_text = extract_body(message.payload, "text/plain")
-      has_html = body_has_type?(message.payload, "text/html")
-      data[:body] = { plain_text: plain_text, has_html: has_html }
+      plain_text = extract_body_with_encoding(message.payload, "text/plain")
+      if include_html
+        html = extract_body_with_encoding(message.payload, "text/html")
+        data[:body] = { plain_text: plain_text, html: html }
+      else
+        has_html = body_has_type?(message.payload, "text/html")
+        data[:body] = { plain_text: plain_text, has_html: has_html }
+      end
     end
 
     data
@@ -198,7 +206,7 @@ class GmailSearcher
     end
   end
 
-  # Base64 URL-safeデコードを行う
+  # Base64 URL-safeデコードを行う（既にデコード済みの場合はそのまま返す）
   #
   # @param encoded_data [String] エンコードされたデータ
   # @return [String] デコードされた文字列
@@ -207,7 +215,69 @@ class GmailSearcher
 
     Base64.urlsafe_decode64(encoded_data).force_encoding("UTF-8")
   rescue ArgumentError
+    # Gmail APIが既にデコード済みのデータを返す場合がある
+    encoded_data.force_encoding("UTF-8")
+  end
+
+  # Content-Typeヘッダーからcharsetを抽出する
+  #
+  # @param content_type [String, nil] Content-Typeヘッダー値
+  # @return [String, nil] charset値
+  def extract_charset(content_type)
+    return nil if content_type.nil?
+
+    match = content_type.match(/charset=["']?([^"';\s]+)["']?/i)
+    match&.[](1)
+  end
+
+  # エンコーディングを考慮してメッセージ本文を抽出する
+  #
+  # @param payload [Google::Apis::GmailV1::MessagePart] メッセージペイロード
+  # @param mime_type [String] 取得したいMIMEタイプ
+  # @return [String] デコードされた本文
+  def extract_body_with_encoding(payload, mime_type)
+    return "" if payload.nil?
+
+    # 単一パートの場合
+    if payload.mime_type == mime_type && payload.body&.data
+      return decode_body_with_encoding(payload.body.data, payload.headers)
+    end
+
+    # マルチパートの場合
+    if payload.parts
+      target_part = payload.parts.find { |p| p.mime_type == mime_type }
+      return decode_body_with_encoding(target_part.body.data, target_part.headers) if target_part&.body&.data
+
+      payload.parts.each do |part|
+        result = extract_body_with_encoding(part, mime_type)
+        return result unless result.empty?
+      end
+    end
+
     ""
+  end
+
+  # エンコーディングを考慮してBase64デコードを行う（既にデコード済みの場合も対応）
+  #
+  # @param encoded_data [String] エンコードされたデータ
+  # @param headers [Array<Google::Apis::GmailV1::MessagePartHeader>, nil] ヘッダー配列
+  # @return [String] デコードされた文字列
+  def decode_body_with_encoding(encoded_data, headers)
+    return "" if encoded_data.nil? || encoded_data.empty?
+
+    content_type = find_header(headers || [], "Content-Type")
+    charset = extract_charset(content_type) || "UTF-8"
+
+    # Base64デコードを試みる。失敗した場合は既にデコード済みとみなす
+    decoded = begin
+      Base64.urlsafe_decode64(encoded_data)
+    rescue ArgumentError
+      encoded_data.dup
+    end
+
+    decoded.encode("UTF-8", charset, invalid: :replace, undef: :replace)
+  rescue Encoding::InvalidByteSequenceError, Encoding::UndefinedConversionError
+    decoded.force_encoding("UTF-8")
   end
 end
 
@@ -218,7 +288,8 @@ def parse_options
   options = {
     query: nil,
     max_results: GmailSearcher::DEFAULT_MAX_RESULTS,
-    include_body: true
+    include_body: true,
+    include_html: false
   }
 
   parser = build_option_parser(options)
@@ -263,6 +334,10 @@ def define_optional_options(opts, options)
     options[:include_body] = false
   end
 
+  opts.on("--include-html", "Include HTML body content (default: flag only)") do
+    options[:include_html] = true
+  end
+
   opts.on("-h", "--help", "Show this help message") do
     puts opts
     exit
@@ -275,6 +350,7 @@ def define_examples(opts)
   opts.separator "  ruby gmail_searcher.rb --query='from:apple.com AirTag'"
   opts.separator "  ruby gmail_searcher.rb --query='from:amazon.co.jp after:2025/01/01' --max-results=5"
   opts.separator "  ruby gmail_searcher.rb --query='subject:invoice' --no-body"
+  opts.separator "  ruby gmail_searcher.rb --query='from:amazon.co.jp' --include-html"
   opts.separator ""
   opts.separator "Gmail query operators:"
   opts.separator "  from:sender        - Messages from specific sender"
@@ -303,7 +379,8 @@ if __FILE__ == $PROGRAM_NAME
     searcher.search(
       query: options[:query],
       max_results: options[:max_results],
-      include_body: options[:include_body]
+      include_body: options[:include_body],
+      include_html: options[:include_html]
     )
   rescue StandardError => e
     puts JSON.generate({ error: e.message })
