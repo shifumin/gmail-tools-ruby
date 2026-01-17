@@ -1,0 +1,44 @@
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.4
+  Exclude:
+    - 'vendor/**/*'
+    - 'tmp/**/*'
+
+# 行長を120文字に緩和（デフォルトは80文字）
+Layout/LineLength:
+  Max: 120
+
+# クラス/モジュールのドキュメントコメントを必須としない
+Style/Documentation:
+  Enabled: false
+
+# frozen_string_literal は既に使用しているので維持
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+# 文字列リテラルはダブルクォートで統一
+Style/StringLiterals:
+  Enabled: true
+  EnforcedStyle: double_quotes
+
+# メソッド長の制限
+Metrics/MethodLength:
+  Max: 30
+
+# ABC複雑度の制限
+Metrics/AbcSize:
+  Max: 30
+
+# クラス長の制限
+Metrics/ClassLength:
+  Max: 120
+
+# 循環的複雑度の制限（再帰的なメール本文抽出のため緩和）
+Metrics/CyclomaticComplexity:
+  Max: 15
+
+# 認知的複雑度の制限
+Metrics/PerceivedComplexity:
+  Max: 15
