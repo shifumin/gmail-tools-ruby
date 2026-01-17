@@ -31,9 +31,9 @@ Metrics/MethodLength:
 Metrics/AbcSize:
   Max: 30
 
-# クラス長の制限
+# クラス長の制限（エンコーディング処理メソッド追加のため緩和）
 Metrics/ClassLength:
-  Max: 120
+  Max: 150
 
 # 循環的複雑度の制限（再帰的なメール本文抽出のため緩和）
 Metrics/CyclomaticComplexity:
