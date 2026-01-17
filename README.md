@@ -1,113 +1,109 @@
 # Gmail Tools Ruby
 
-Gmail API を使ったRubyツール集。OAuth 2.0認証でメールの検索・取得を行う。
+A collection of Ruby CLI tools for Gmail API. Search and fetch emails with OAuth 2.0 authentication (read-only).
 
-## 主要ファイル
+## Features
 
-| ファイル | 説明 |
-|---------|------|
-| `gmail_authenticator.rb` | OAuth認証（読み取り専用） |
-| `gmail_searcher.rb` | メール検索 |
-| `gmail_fetcher.rb` | 単一メール取得（ID指定） |
+- **Search emails** with Gmail query syntax
+- **Fetch single email** by message ID
+- **JSON output** for easy parsing
+- **HTML body extraction** for HTML-only emails
 
-## セットアップ
+## Requirements
 
-### 1. 依存関係インストール
+- Ruby >= 3.4.0
+- Google Cloud project with Gmail API enabled
+
+## Installation
 
 ```bash
 bundle install
 ```
 
-### 2. Google Cloud Console で OAuth 設定
+## Setup
 
-1. [Google Cloud Console](https://console.cloud.google.com/) でプロジェクトを作成
-2. Gmail API を有効化
-3. OAuth 2.0 クライアント ID を作成（デスクトップアプリ）
-4. クライアントID・シークレットを取得
+### 1. Configure Google Cloud Console
 
-### 3. 環境変数設定
+1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
+2. Enable Gmail API
+3. Create OAuth 2.0 Client ID (Desktop app)
+4. Get Client ID and Client Secret
 
-mise / direnv / shell export など任意の方法で設定:
+### 2. Set Environment Variables
 
 ```bash
 export GOOGLE_CLIENT_ID="your-client-id"
 export GOOGLE_CLIENT_SECRET="your-client-secret"
 ```
 
-### 4. 認証
+### 3. Authenticate
 
 ```bash
 ruby gmail_authenticator.rb
 ```
 
-ブラウザが開くので Google アカウントで認証し、表示されたコードを入力する。
-トークンは `~/.credentials/gmail-readonly-token.yaml` に保存される。
+A browser will open for Google authentication. Enter the authorization code when prompted.
+Token is saved to `~/.credentials/gmail-readonly-token.yaml`.
 
-## 使い方
+## Usage
 
-### メール検索
+### Search Emails
 
 ```bash
-# 基本検索
-ruby gmail_searcher.rb --query='from:apple.com AirTag'
+# Basic search
+ruby gmail_searcher.rb --query='from:example.com'
 
-# 日付範囲指定
-ruby gmail_searcher.rb --query='from:amazon.co.jp after:2025/01/01 before:2025/06/01'
+# Date range
+ruby gmail_searcher.rb --query='after:2025/01/01 before:2025/06/01'
 
-# 結果件数制限
+# Limit results
 ruby gmail_searcher.rb --query='subject:invoice' --max-results=5
 
-# 本文なし（高速）
+# Without body (faster)
 ruby gmail_searcher.rb --query='is:unread' --no-body
+
+# Include HTML body
+ruby gmail_searcher.rb --query='from:amazon.com' --include-html
 ```
 
-### 単一メール取得
+### Fetch Single Email
 
 ```bash
-# メッセージIDを指定して取得
+# Fetch by message ID
 ruby gmail_fetcher.rb --message-id='18abc123def456'
 
-# メタデータのみ（高速）
+# Metadata only (faster)
 ruby gmail_fetcher.rb --message-id='18abc123def456' --format=metadata
 ```
 
-## Gmail検索クエリ演算子
+### Gmail Query Operators
 
-| 演算子 | 例 | 説明 |
-|--------|-----|------|
-| `from:` | `from:apple.com` | 送信元 |
-| `to:` | `to:me@example.com` | 宛先 |
-| `subject:` | `subject:invoice` | 件名 |
-| `after:` | `after:2025/01/01` | 日付以降 |
-| `before:` | `before:2025/06/01` | 日付以前 |
-| `newer_than:` | `newer_than:7d` | 相対日付（7日以内） |
-| `older_than:` | `older_than:1y` | 相対日付（1年以上前） |
-| `has:attachment` | - | 添付ファイルあり |
-| `filename:` | `filename:pdf` | 添付ファイル種類 |
-| `label:` | `label:important` | ラベル |
-| `is:` | `is:unread` | ステータス |
+| Operator | Example | Description |
+|----------|---------|-------------|
+| `from:` | `from:example.com` | From sender |
+| `to:` | `to:me@example.com` | To recipient |
+| `subject:` | `subject:invoice` | Subject contains |
+| `after:` | `after:2025/01/01` | After date |
+| `before:` | `before:2025/06/01` | Before date |
+| `newer_than:` | `newer_than:7d` | Within last N days |
+| `has:attachment` | - | Has attachments |
+| `label:` | `label:important` | Has label |
+| `is:` | `is:unread` | Status |
 
-複数の演算子を組み合わせ可能:
-```bash
-ruby gmail_searcher.rb --query='from:apple.com subject:order after:2025/01/01'
-```
-
-## JSON出力形式
-
-### 検索結果
+## Output Format
 
 ```json
 {
-  "query": "from:apple.com AirTag",
+  "query": "from:example.com",
   "result_count": 1,
   "messages": [
     {
       "id": "18abc123def456",
       "thread_id": "18abc123def456",
       "date": "Wed, 15 Jan 2025 10:30:00 +0900",
-      "from": "Apple <noreply@email.apple.com>",
+      "from": "Example <noreply@example.com>",
       "to": "user@example.com",
-      "subject": "Your AirTag order has shipped",
+      "subject": "Your order has shipped",
       "snippet": "Your order is on its way...",
       "labels": ["INBOX", "CATEGORY_UPDATES"],
       "body": {
@@ -119,24 +115,6 @@ ruby gmail_searcher.rb --query='from:apple.com subject:order after:2025/01/01'
 }
 ```
 
-## 技術スタック
+## License
 
-- Ruby >= 3.4.0
-- google-apis-gmail_v1（Gmail API）
-- googleauth（OAuth 2.0認証）
-- rubocop（リンター）
-
-## 開発
-
-```bash
-# リンター実行
-bundle exec rubocop
-
-# 自動修正
-bundle exec rubocop -a
-```
-
-## 注意事項
-
-- 認証トークンファイルはコミットしない
-- Gmail readonly スコープのみ使用（メールの読み取りのみ、送信・削除不可）
+MIT
