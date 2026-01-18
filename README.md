@@ -49,6 +49,19 @@ Token is saved to `~/.credentials/gmail-readonly-token.yaml`.
 
 ### Search Emails
 
+#### Options
+
+| Option | Required | Default | Description |
+|--------|:--------:|---------|-------------|
+| `--query=QUERY` | Yes | - | Gmail search query (same syntax as Gmail search box) |
+| `--max-results=N` | No | 10 | Maximum number of results to return |
+| `--no-body` | No | - | Exclude message body (faster response) |
+| `--include-html` | No | - | Include HTML body content in response |
+
+**Note**: By default, HTML body is not included. The response only shows `has_html: true/false` flag. Use `--include-html` to get the actual HTML content.
+
+#### Examples
+
 ```bash
 # Basic search
 ruby gmail_searcher.rb --query='from:example.com'
@@ -67,6 +80,24 @@ ruby gmail_searcher.rb --query='from:amazon.com' --include-html
 ```
 
 ### Fetch Single Email
+
+#### Options
+
+| Option | Required | Default | Description |
+|--------|:--------:|---------|-------------|
+| `--message-id=ID` | Yes | - | Gmail message ID to fetch |
+| `--format=FORMAT` | No | full | Response format (see below) |
+
+**Format values**:
+
+| Format | Description |
+|--------|-------------|
+| `full` | Complete message with body, HTML, and attachment info |
+| `metadata` | Headers and metadata only (faster) |
+| `minimal` | Minimal information (id, threadId, labelIds) |
+| `raw` | Raw RFC 2822 formatted message |
+
+#### Examples
 
 ```bash
 # Fetch by message ID
