@@ -2,7 +2,7 @@
 
 ## プロジェクト概要
 
-Gmail APIを使ったRubyツール。OAuth 2.0認証でメールの検索・取得を行う（読み取り専用）。
+Gmail APIを使ったRubyツール。OAuth 2.0認証でメールの検索・取得・スパム削除を行う。
 
 ## 開発コマンド
 
@@ -25,10 +25,13 @@ bundle exec rubocop -a   # リンター自動修正
 | `GOOGLE_CLIENT_ID` | OAuth Client ID |
 | `GOOGLE_CLIENT_SECRET` | OAuth Client Secret |
 
-認証トークン保存先: `~/.credentials/gmail-readonly-token.yaml`
+認証トークン保存先:
+- `~/.credentials/gmail-readonly-token.yaml`（readonlyスコープ）
+- `~/.credentials/gmail-modify-token.yaml`（modifyスコープ）
 
 ## 注意事項
 
 - 認証トークンファイルはコミット禁止（機密情報）
-- Gmail readonlyスコープのみ使用（送信・削除不可）
+- readonlyスコープ: 検索・取得のみ（送信・削除不可）
+- modifyスコープ: 検索・取得 + ゴミ箱移動（送信・完全削除不可）
 - テストファイルは未作成

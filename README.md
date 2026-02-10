@@ -1,11 +1,12 @@
 # Gmail Tools Ruby
 
-A collection of Ruby CLI tools for Gmail API. Search and fetch emails with OAuth 2.0 authentication (read-only).
+A collection of Ruby CLI tools for Gmail API with OAuth 2.0 authentication.
 
 ## Features
 
 - **Search emails** with Gmail query syntax
 - **Fetch single email** by message ID
+- **Trash spam** - Move spam messages to trash in bulk
 - **JSON output** for easy parsing
 - **HTML body extraction** for HTML-only emails
 
@@ -39,11 +40,19 @@ export GOOGLE_CLIENT_SECRET="your-client-secret"
 ### 3. Authenticate
 
 ```bash
+# Read-only (search, fetch)
 ruby gmail_authenticator.rb
+
+# Read and modify (required for trash spam)
+ruby gmail_authenticator.rb --scope=modify
 ```
 
 A browser will open for Google authentication. Enter the authorization code when prompted.
-Token is saved to `~/.credentials/gmail-readonly-token.yaml`.
+
+| Scope | Token file | Capabilities |
+|-------|-----------|-------------|
+| `readonly` (default) | `~/.credentials/gmail-readonly-token.yaml` | Search, fetch |
+| `modify` | `~/.credentials/gmail-modify-token.yaml` | Search, fetch, trash |
 
 ## Usage
 
@@ -105,6 +114,31 @@ ruby gmail_fetcher.rb --message-id='18abc123def456'
 
 # Metadata only (faster)
 ruby gmail_fetcher.rb --message-id='18abc123def456' --format=metadata
+```
+
+### Trash Spam
+
+Move spam messages to trash in bulk. Requires `modify` scope authentication.
+
+#### Options
+
+| Option | Required | Default | Description |
+|--------|:--------:|---------|-------------|
+| `--max-results=N` | No | 500 | Maximum number of spam messages to process |
+| `--dry-run` | No | - | Preview spam messages without trashing |
+| `--batch-size=N` | No | 100 | Messages per batch API call (max: 100) |
+
+#### Examples
+
+```bash
+# Preview spam (dry run)
+ruby gmail_spam_trasher.rb --dry-run
+
+# Trash up to 10 spam messages
+ruby gmail_spam_trasher.rb --max-results=10
+
+# Trash all spam (up to 500)
+ruby gmail_spam_trasher.rb
 ```
 
 ### Gmail Query Operators
