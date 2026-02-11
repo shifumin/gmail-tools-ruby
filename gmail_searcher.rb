@@ -33,9 +33,11 @@ class GmailSearcher
   # @param max_results [Integer] 最大取得件数
   # @param include_body [Boolean] メール本文を含めるか
   # @param include_html [Boolean] HTML本文を含めるか
+  # @param include_spam_trash [Boolean] スパム・ゴミ箱のメールを含めるか
   # @return [void]
-  def search(query:, max_results: DEFAULT_MAX_RESULTS, include_body: true, include_html: false)
-    message_ids = fetch_message_ids(query, max_results)
+  def search(query:, max_results: DEFAULT_MAX_RESULTS, include_body: true, include_html: false,
+             include_spam_trash: false)
+    message_ids = fetch_message_ids(query, max_results, include_spam_trash)
     messages = message_ids.map { |msg| fetch_message_detail(msg.id, include_body, include_html) }
 
     result = {
@@ -78,8 +80,9 @@ class GmailSearcher
   #
   # @param query [String] Gmail検索クエリ
   # @param max_results [Integer] 最大取得件数
+  # @param include_spam_trash [Boolean] スパム・ゴミ箱のメールを含めるか
   # @return [Array<Google::Apis::GmailV1::Message>] メッセージリスト
-  def fetch_message_ids(query, max_results)
+  def fetch_message_ids(query, max_results, include_spam_trash)
     messages = []
     page_token = nil
 
@@ -91,6 +94,7 @@ class GmailSearcher
         "me",
         q: query,
         max_results: batch_size,
+        include_spam_trash: include_spam_trash,
         page_token: page_token
       )
 
@@ -160,33 +164,6 @@ class GmailSearcher
   # @return [String, nil] ヘッダー値
   def find_header(headers, name)
     headers.find { |h| h.name.casecmp?(name) }&.value
-  end
-
-  # メッセージ本文を抽出する
-  #
-  # @param payload [Google::Apis::GmailV1::MessagePart] メッセージペイロード
-  # @param mime_type [String] 取得したいMIMEタイプ
-  # @return [String] デコードされた本文
-  def extract_body(payload, mime_type)
-    return "" if payload.nil?
-
-    # 単一パートの場合
-    return decode_body(payload.body.data) if payload.mime_type == mime_type && payload.body&.data
-
-    # マルチパートの場合
-    if payload.parts
-      # 指定されたMIMEタイプのパートを探す
-      target_part = payload.parts.find { |p| p.mime_type == mime_type }
-      return decode_body(target_part.body.data) if target_part&.body&.data
-
-      # ネストされたパートを再帰的に探す
-      payload.parts.each do |part|
-        result = extract_body(part, mime_type)
-        return result unless result.empty?
-      end
-    end
-
-    ""
   end
 
   # 指定したMIMEタイプの本文が存在するか確認する
@@ -289,7 +266,8 @@ def parse_options
     query: nil,
     max_results: GmailSearcher::DEFAULT_MAX_RESULTS,
     include_body: true,
-    include_html: false
+    include_html: false,
+    include_spam_trash: false
   }
 
   parser = build_option_parser(options)
@@ -338,6 +316,10 @@ def define_optional_options(opts, options)
     options[:include_html] = true
   end
 
+  opts.on("--include-spam-trash", "Include spam and trash messages in results") do
+    options[:include_spam_trash] = true
+  end
+
   opts.on("-h", "--help", "Show this help message") do
     puts opts
     exit
@@ -351,6 +333,7 @@ def define_examples(opts)
   opts.separator "  ruby gmail_searcher.rb --query='from:amazon.co.jp after:2025/01/01' --max-results=5"
   opts.separator "  ruby gmail_searcher.rb --query='subject:invoice' --no-body"
   opts.separator "  ruby gmail_searcher.rb --query='from:amazon.co.jp' --include-html"
+  opts.separator "  ruby gmail_searcher.rb --query='label:spam' --include-spam-trash --no-body"
   opts.separator ""
   opts.separator "Gmail query operators:"
   opts.separator "  from:sender        - Messages from specific sender"
@@ -380,7 +363,8 @@ if __FILE__ == $PROGRAM_NAME
       query: options[:query],
       max_results: options[:max_results],
       include_body: options[:include_body],
-      include_html: options[:include_html]
+      include_html: options[:include_html],
+      include_spam_trash: options[:include_spam_trash]
     )
   rescue StandardError => e
     puts JSON.generate({ error: e.message })

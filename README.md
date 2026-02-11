@@ -66,6 +66,7 @@ A browser will open for Google authentication. Enter the authorization code when
 | `--max-results=N` | No | 10 | Maximum number of results to return |
 | `--no-body` | No | - | Exclude message body (faster response) |
 | `--include-html` | No | - | Include HTML body content in response |
+| `--include-spam-trash` | No | - | Include spam and trash messages in results |
 
 **Note**: By default, HTML body is not included. The response only shows `has_html: true/false` flag. Use `--include-html` to get the actual HTML content.
 
@@ -86,6 +87,12 @@ ruby gmail_searcher.rb --query='is:unread' --no-body
 
 # Include HTML body
 ruby gmail_searcher.rb --query='from:amazon.com' --include-html
+
+# List spam messages
+ruby gmail_searcher.rb --query='label:spam' --include-spam-trash --no-body
+
+# Search including spam and trash folders
+ruby gmail_searcher.rb --query='from:example.com' --include-spam-trash
 ```
 
 ### Fetch Single Email
