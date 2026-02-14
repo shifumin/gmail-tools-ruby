@@ -7,6 +7,7 @@ A collection of Ruby CLI tools for Gmail API with OAuth 2.0 authentication.
 - **Search emails** with Gmail query syntax
 - **Fetch single email** by message ID
 - **Trash spam** - Move spam messages to trash in bulk
+- **Batch modify labels** - Add/remove labels on messages matching a query
 - **JSON output** for easy parsing
 - **HTML body extraction** for HTML-only emails
 
@@ -52,7 +53,7 @@ A browser will open for Google authentication. Enter the authorization code when
 | Scope | Token file | Capabilities |
 |-------|-----------|-------------|
 | `readonly` (default) | `~/.credentials/gmail-readonly-token.yaml` | Search, fetch |
-| `modify` | `~/.credentials/gmail-modify-token.yaml` | Search, fetch, trash |
+| `modify` | `~/.credentials/gmail-modify-token.yaml` | Search, fetch, trash, batch modify labels |
 
 ## Usage
 
@@ -146,6 +147,38 @@ ruby gmail_spam_trasher.rb --max-results=10
 
 # Trash all spam (up to 500)
 ruby gmail_spam_trasher.rb
+```
+
+### Batch Modify Labels
+
+Batch add/remove labels on messages matching a query. Requires `modify` scope authentication.
+
+#### Options
+
+| Option | Required | Default | Description |
+|--------|:--------:|---------|-------------|
+| `--query=QUERY` | Yes | - | Gmail search query (required) |
+| `--add-labels=LABELS` | No* | - | Comma-separated label IDs to add |
+| `--remove-labels=LABELS` | No* | - | Comma-separated label IDs to remove |
+| `--max-results=N` | No | all | Maximum number of messages to process |
+| `--dry-run` | No | - | Preview messages without modifying |
+
+\* At least one of `--add-labels` or `--remove-labels` is required.
+
+#### Examples
+
+```bash
+# Archive social emails (remove from inbox)
+ruby gmail_batch_modifier.rb --query='category:social is:unread' --remove-labels=INBOX,UNREAD
+
+# Archive promotions
+ruby gmail_batch_modifier.rb --query='category:promotions is:unread' --remove-labels=INBOX,UNREAD
+
+# Preview changes (dry run)
+ruby gmail_batch_modifier.rb --query='from:noreply@example.com' --remove-labels=INBOX --dry-run
+
+# Process limited number of messages
+ruby gmail_batch_modifier.rb --query='category:social' --remove-labels=INBOX --max-results=50
 ```
 
 ### Gmail Query Operators
