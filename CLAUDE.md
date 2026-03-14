@@ -1,37 +1,47 @@
 # CLAUDE.md
 
-## プロジェクト概要
+## Project Overview
 
-Gmail APIを使ったRubyツール。OAuth 2.0認証でメールの検索・取得・スパム削除・バッチラベル変更を行う。
+Ruby CLI tools for Gmail API. Performs email search, fetch, spam trash, and batch label modification via OAuth 2.0 authentication.
 
-## 開発コマンド
+## Project Structure
+
+| File | Description | Scope |
+|------|-------------|-------|
+| `gmail_authenticator.rb` | OAuth 2.0 authentication setup | readonly / modify |
+| `gmail_searcher.rb` | Search messages with Gmail query syntax | readonly |
+| `gmail_fetcher.rb` | Fetch a single message by ID | readonly |
+| `gmail_spam_trasher.rb` | Bulk move spam messages to trash | modify |
+| `gmail_batch_modifier.rb` | Batch add/remove labels on messages | modify |
+
+## Development Commands
 
 ```bash
-bundle install           # 依存関係インストール
-bundle exec rubocop      # リンター実行
-bundle exec rubocop -a   # リンター自動修正
+bundle install           # Install dependencies
+bundle exec rubocop      # Run linter
+bundle exec rubocop -a   # Run linter with auto-fix
 ```
 
-## コーディング規約
+## Coding Conventions
 
-- YARDコメントを使用（`@param`, `@return`, `@raise`）
-- 出力はJSON形式で統一
-- RuboCop設定は `.rubocop.yml` を参照
+- YARD comments (`@param`, `@return`, `@raise`) on public methods
+- JSON output for all tools
+- See `.rubocop.yml` for linter settings
 
-## 環境変数
+## Environment Variables
 
-| 変数名 | 説明 |
-|--------|------|
+| Variable | Description |
+|----------|-------------|
 | `GOOGLE_CLIENT_ID` | OAuth Client ID |
 | `GOOGLE_CLIENT_SECRET` | OAuth Client Secret |
 
-認証トークン保存先:
-- `~/.credentials/gmail-readonly-token.yaml`（readonlyスコープ）
-- `~/.credentials/gmail-modify-token.yaml`（modifyスコープ）
+Token file locations:
+- `~/.credentials/gmail-readonly-token.yaml` (readonly scope)
+- `~/.credentials/gmail-modify-token.yaml` (modify scope)
 
-## 注意事項
+## Notes
 
-- 認証トークンファイルはコミット禁止（機密情報）
-- readonlyスコープ: 検索・取得のみ（送信・削除不可）
-- modifyスコープ: 検索・取得 + ゴミ箱移動 + バッチラベル変更（送信・完全削除不可）
-- テストファイルは未作成
+- Never commit token files (sensitive credentials)
+- readonly scope: search and fetch only (no send, no delete)
+- modify scope: search, fetch, trash, and batch label modify (no send, no permanent delete)
+- No test files yet

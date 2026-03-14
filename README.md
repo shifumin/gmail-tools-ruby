@@ -16,29 +16,29 @@ A collection of Ruby CLI tools for Gmail API with OAuth 2.0 authentication.
 - Ruby >= 3.4.0
 - Google Cloud project with Gmail API enabled
 
-## Installation
+## Setup
+
+### 1. Install Dependencies
 
 ```bash
 bundle install
 ```
 
-## Setup
-
-### 1. Configure Google Cloud Console
+### 2. Configure Google Cloud Console
 
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
 2. Enable Gmail API
 3. Create OAuth 2.0 Client ID (Desktop app)
 4. Get Client ID and Client Secret
 
-### 2. Set Environment Variables
+### 3. Set Environment Variables
 
 ```bash
 export GOOGLE_CLIENT_ID="your-client-id"
 export GOOGLE_CLIENT_SECRET="your-client-secret"
 ```
 
-### 3. Authenticate
+### 4. Authenticate
 
 ```bash
 # Read-only (search, fetch)
@@ -88,9 +88,6 @@ ruby gmail_searcher.rb --query='is:unread' --no-body
 
 # Include HTML body
 ruby gmail_searcher.rb --query='from:amazon.com' --include-html
-
-# List spam messages
-ruby gmail_searcher.rb --query='label:spam' --include-spam-trash --no-body
 
 # Search including spam and trash folders
 ruby gmail_searcher.rb --query='from:example.com' --include-spam-trash
@@ -179,45 +176,6 @@ ruby gmail_batch_modifier.rb --query='from:noreply@example.com' --remove-labels=
 
 # Process limited number of messages
 ruby gmail_batch_modifier.rb --query='category:social' --remove-labels=INBOX --max-results=50
-```
-
-### Gmail Query Operators
-
-| Operator | Example | Description |
-|----------|---------|-------------|
-| `from:` | `from:example.com` | From sender |
-| `to:` | `to:me@example.com` | To recipient |
-| `subject:` | `subject:invoice` | Subject contains |
-| `after:` | `after:2025/01/01` | After date |
-| `before:` | `before:2025/06/01` | Before date |
-| `newer_than:` | `newer_than:7d` | Within last N days |
-| `has:attachment` | - | Has attachments |
-| `label:` | `label:important` | Has label |
-| `is:` | `is:unread` | Status |
-
-## Output Format
-
-```json
-{
-  "query": "from:example.com",
-  "result_count": 1,
-  "messages": [
-    {
-      "id": "18abc123def456",
-      "thread_id": "18abc123def456",
-      "date": "Wed, 15 Jan 2025 10:30:00 +0900",
-      "from": "Example <noreply@example.com>",
-      "to": "user@example.com",
-      "subject": "Your order has shipped",
-      "snippet": "Your order is on its way...",
-      "labels": ["INBOX", "CATEGORY_UPDATES"],
-      "body": {
-        "plain_text": "...",
-        "has_html": true
-      }
-    }
-  ]
-}
 ```
 
 ## License
