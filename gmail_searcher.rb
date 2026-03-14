@@ -183,19 +183,6 @@ class GmailSearcher
     end
   end
 
-  # Base64 URL-safeデコードを行う（既にデコード済みの場合はそのまま返す）
-  #
-  # @param encoded_data [String] エンコードされたデータ
-  # @return [String] デコードされた文字列
-  def decode_body(encoded_data)
-    return "" if encoded_data.nil? || encoded_data.empty?
-
-    Base64.urlsafe_decode64(encoded_data).force_encoding("UTF-8")
-  rescue ArgumentError
-    # Gmail APIが既にデコード済みのデータを返す場合がある
-    encoded_data.force_encoding("UTF-8")
-  end
-
   # Content-Typeヘッダーからcharsetを抽出する
   #
   # @param content_type [String, nil] Content-Typeヘッダー値
@@ -221,14 +208,9 @@ class GmailSearcher
     end
 
     # マルチパートの場合
-    if payload.parts
-      target_part = payload.parts.find { |p| p.mime_type == mime_type }
-      return decode_body_with_encoding(target_part.body.data, target_part.headers) if target_part&.body&.data
-
-      payload.parts.each do |part|
-        result = extract_body_with_encoding(part, mime_type)
-        return result unless result.empty?
-      end
+    payload.parts&.each do |part|
+      result = extract_body_with_encoding(part, mime_type)
+      return result unless result.empty?
     end
 
     ""

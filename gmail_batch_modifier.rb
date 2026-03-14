@@ -34,11 +34,7 @@ class GmailBatchModifier
   # @param dry_run [Boolean] trueの場合、実際には変更しない
   # @return [void]
   def modify(query:, add_labels: [], remove_labels: [], max_results: nil, dry_run: false)
-    @query = query
-    @add_labels = add_labels
-    @remove_labels = remove_labels
-
-    messages = fetch_message_ids(max_results)
+    messages = fetch_message_ids(query, max_results)
 
     if messages.empty?
       puts JSON.pretty_generate({ total_count: 0, message: "No messages found." })
@@ -47,14 +43,22 @@ class GmailBatchModifier
 
     if dry_run
       puts JSON.pretty_generate({
-                                  dry_run: true, query: @query,
+                                  dry_run: true, query: query,
                                   total_count: messages.size, message_ids: messages.map(&:id)
                                 })
       return
     end
 
-    modified, failed_batches = modify_messages_in_batches(messages)
-    puts JSON.pretty_generate(build_summary(messages.size, modified, failed_batches))
+    modified, failed_batches = modify_messages_in_batches(messages, add_labels, remove_labels)
+    puts JSON.pretty_generate({
+                                query: query,
+                                total_count: messages.size,
+                                modified_count: modified,
+                                add_labels: add_labels,
+                                remove_labels: remove_labels,
+                                failed_batches: failed_batches,
+                                success: failed_batches.empty?
+                              })
   end
 
   private
@@ -86,9 +90,10 @@ class GmailBatchModifier
 
   # クエリに一致するメッセージIDリストを取得する
   #
+  # @param query [String] Gmail検索クエリ
   # @param max_results [Integer, nil] 最大取得件数（nilの場合は全件）
   # @return [Array<Google::Apis::GmailV1::Message>] メッセージリスト
-  def fetch_message_ids(max_results)
+  def fetch_message_ids(query, max_results)
     messages = []
     page_token = nil
 
@@ -97,7 +102,7 @@ class GmailBatchModifier
 
       response = @service.list_user_messages(
         "me",
-        q: @query,
+        q: query,
         max_results: page_size,
         page_token: page_token
       )
@@ -117,13 +122,15 @@ class GmailBatchModifier
   # メッセージをバッチでラベル変更する
   #
   # @param messages [Array<Google::Apis::GmailV1::Message>] メッセージリスト
+  # @param add_labels [Array<String>] 追加するラベルIDリスト
+  # @param remove_labels [Array<String>] 削除するラベルIDリスト
   # @return [Array(Integer, Array<Hash>)] 変更した件数と失敗したバッチの配列
-  def modify_messages_in_batches(messages)
+  def modify_messages_in_batches(messages, add_labels, remove_labels)
     modified = 0
     failed_batches = []
 
     messages.each_slice(MAX_BATCH_SIZE).with_index do |batch, index|
-      modify_batch(batch)
+      modify_batch(batch, add_labels, remove_labels)
       modified += batch.size
       warn "\rModified: #{modified}/#{messages.size}"
     rescue Google::Apis::Error => e
@@ -137,32 +144,16 @@ class GmailBatchModifier
   # バッチでメッセージのラベルを変更する
   #
   # @param messages [Array<Google::Apis::GmailV1::Message>] メッセージリスト
+  # @param add_labels [Array<String>] 追加するラベルIDリスト
+  # @param remove_labels [Array<String>] 削除するラベルIDリスト
   # @return [void]
-  def modify_batch(messages)
+  def modify_batch(messages, add_labels, remove_labels)
     body = Google::Apis::GmailV1::BatchModifyMessagesRequest.new(
       ids: messages.map(&:id),
-      add_label_ids: @add_labels,
-      remove_label_ids: @remove_labels
+      add_label_ids: add_labels,
+      remove_label_ids: remove_labels
     )
     @service.batch_modify_messages("me", body)
-  end
-
-  # 結果サマリーを構築する
-  #
-  # @param total [Integer] 総件数
-  # @param modified [Integer] 変更した件数
-  # @param failed_batches [Array<Hash>] 失敗したバッチの情報
-  # @return [Hash] サマリー
-  def build_summary(total, modified, failed_batches)
-    {
-      query: @query,
-      total_count: total,
-      modified_count: modified,
-      add_labels: @add_labels,
-      remove_labels: @remove_labels,
-      failed_batches: failed_batches,
-      success: failed_batches.empty?
-    }
   end
 end
 
@@ -181,7 +172,7 @@ def parse_options
   parser = build_option_parser(options)
   parser.parse!
 
-  validate_options(options)
+  validate_options(options, parser)
   options
 end
 
@@ -239,14 +230,22 @@ end
 # コマンドラインオプションを検証する
 #
 # @param options [Hash] オプション
-# @raise [RuntimeError] 必須オプションが不足している場合
+# @param parser [OptionParser] パーサー（ヘルプ表示用）
 # @return [void]
-def validate_options(options)
-  raise "Error: --query is required." if options[:query].nil? || options[:query].empty?
+def validate_options(options, parser)
+  errors = []
+  errors << "--query is required" if options[:query].nil? || options[:query].empty?
 
-  return unless options[:add_labels].empty? && options[:remove_labels].empty?
+  if options[:add_labels].empty? && options[:remove_labels].empty?
+    errors << "--add-labels or --remove-labels (or both) is required"
+  end
 
-  raise "Error: --add-labels or --remove-labels (or both) is required."
+  return if errors.empty?
+
+  errors.each { |e| warn "Error: #{e}" }
+  warn ""
+  warn parser
+  exit 1
 end
 
 # Main execution

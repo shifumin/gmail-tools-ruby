@@ -103,31 +103,6 @@ class GmailFetcher
     headers.find { |h| h.name.casecmp?(name) }&.value
   end
 
-  # メッセージ本文を抽出する
-  #
-  # @param payload [Google::Apis::GmailV1::MessagePart] メッセージペイロード
-  # @param mime_type [String] 取得したいMIMEタイプ
-  # @return [String] デコードされた本文
-  def extract_body(payload, mime_type)
-    return "" if payload.nil?
-
-    # 単一パートの場合
-    return decode_body(payload.body.data) if payload.mime_type == mime_type && payload.body&.data
-
-    # マルチパートの場合
-    if payload.parts
-      target_part = payload.parts.find { |p| p.mime_type == mime_type }
-      return decode_body(target_part.body.data) if target_part&.body&.data
-
-      payload.parts.each do |part|
-        result = extract_body(part, mime_type)
-        return result unless result.empty?
-      end
-    end
-
-    ""
-  end
-
   # 添付ファイル情報を抽出する
   #
   # @param payload [Google::Apis::GmailV1::MessagePart] メッセージペイロード
@@ -151,19 +126,6 @@ class GmailFetcher
     end
 
     attachments
-  end
-
-  # Base64 URL-safeデコードを行う（既にデコード済みの場合はそのまま返す）
-  #
-  # @param encoded_data [String] エンコードされたデータ
-  # @return [String] デコードされた文字列
-  def decode_body(encoded_data)
-    return "" if encoded_data.nil? || encoded_data.empty?
-
-    Base64.urlsafe_decode64(encoded_data).force_encoding("UTF-8")
-  rescue ArgumentError
-    # Gmail APIが既にデコード済みのデータを返す場合がある
-    encoded_data.force_encoding("UTF-8")
   end
 
   # Content-Typeヘッダーからcharsetを抽出する
@@ -191,14 +153,9 @@ class GmailFetcher
     end
 
     # マルチパートの場合
-    if payload.parts
-      target_part = payload.parts.find { |p| p.mime_type == mime_type }
-      return decode_body_with_encoding(target_part.body.data, target_part.headers) if target_part&.body&.data
-
-      payload.parts.each do |part|
-        result = extract_body_with_encoding(part, mime_type)
-        return result unless result.empty?
-      end
+    payload.parts&.each do |part|
+      result = extract_body_with_encoding(part, mime_type)
+      return result unless result.empty?
     end
 
     ""

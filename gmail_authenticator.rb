@@ -127,11 +127,11 @@ class GmailAuthenticator
   def open_browser(url)
     case RUBY_PLATFORM
     when /darwin/
-      system("open '#{url}'")
+      system("open", url)
     when /linux/
-      system("xdg-open '#{url}'")
+      system("xdg-open", url)
     when /mingw|mswin/
-      system("start '#{url}'")
+      system("start", "", url)
     end
   end
 
@@ -145,7 +145,7 @@ class GmailAuthenticator
   end
 
   def ensure_credentials_directory
-    FileUtils.mkdir_p(CREDENTIALS_DIR) unless File.directory?(CREDENTIALS_DIR)
+    FileUtils.mkdir_p(CREDENTIALS_DIR)
   end
 end
 
